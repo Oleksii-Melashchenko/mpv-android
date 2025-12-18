@@ -55,6 +55,105 @@ jni_func(void, create, jobject appctx) {
     g_mpv = mpv_create();
     if (!g_mpv)
         die("context init failed");
+    typedef struct {
+        const char* name;
+        const char* shaders[5];
+        int shader_count;
+        const char* scale;
+        const char* cscale;
+        const char* dscale;
+        const char* deband;
+        const char* hwdec;
+    } mpv_profile_t;
+    mpv_profile_t profiles[] = {
+            { // слабый
+                    "light",
+                    { "Anime4K_Clamp_Highlights.glsl" },
+                    1,
+                    "bilinear",
+                    "bilinear",
+                    "bilinear",
+                    "no",
+                    "auto-safe"
+            },
+            { // нормальный
+                    "normal",
+                    {
+                      "Anime4K_Clamp_Highlights.glsl",
+                            "Anime4K_Darken_Fast.glsl",
+                            "Anime4K_Thin_Fast.glsl",
+                            "Anime4K_Upscale_Original_x2.glsl"
+                    },
+                    4,
+                    "ewa_lanczos",
+                    "ewa_lanczos",
+                    "mitchell",
+                    "yes",
+                    "auto-safe"
+            },
+            { // мощный
+                    "high",
+                    {
+                      "Anime4K_Clamp_Highlights.glsl",
+                            "Anime4K_Darken_HQ.glsl",
+                            "Anime4K_Thin_HQ.glsl",
+                            "Anime4K_Upscale_DoG_x2.glsl"
+                    },
+                    4,
+                    "ewa_lanczossharp",
+                    "ewa_lanczossharp",
+                    "mitchell",
+                    "yes",
+                    "auto"
+            }
+    };
+    void apply_profile(int profile_index) {
+        mpv_profile_t* p = &profiles[profile_index];
+
+        mpv_set_option_string(g_mpv, "hwdec", p->hwdec);
+        mpv_set_option_string(g_mpv, "scale", p->scale);
+        mpv_set_option_string(g_mpv, "cscale", p->cscale);
+        mpv_set_option_string(g_mpv, "dscale", p->dscale);
+        mpv_set_option_string(g_mpv, "deband", p->deband);
+
+        mpv_command_string(g_mpv, "glsl-shaders-clear");
+
+        for (int i = 0; i < p->shader_count; i++) {
+            mpv_set_option_string(g_mpv, "glsl-shaders-append", p->shaders[i]);
+        }
+    }
+    mpv_set_option_string(g_mpv, "vo", "gpu");
+    mpv_set_option_string(g_mpv, "gpu-api", "opengl");
+    mpv_set_option_string(g_mpv, "gpu-context", "android");
+
+    mpv_set_option_string(g_mpv, "hwdec", "auto-safe");
+    mpv_set_option_string(g_mpv, "hwdec-codecs", "all");
+
+    mpv_set_option_string(g_mpv, "profile", "gpu-hq");
+    mpv_set_option_string(g_mpv, "scale", "ewa_lanczossharp");
+    mpv_set_option_string(g_mpv, "cscale", "ewa_lanczossharp");
+    mpv_set_option_string(g_mpv, "dscale", "mitchell");
+
+    mpv_set_option_string(g_mpv, "sigmoid-upscaling", "yes");
+    mpv_set_option_string(g_mpv, "correct-downscaling", "yes");
+    mpv_set_option_string(g_mpv, "linear-downscaling", "no");
+
+    mpv_set_option_string(g_mpv, "deband", "yes");
+    mpv_set_option_string(g_mpv, "deband-iterations", "2");
+    mpv_set_option_string(g_mpv, "deband-threshold", "35");
+    mpv_set_option_string(g_mpv, "deband-range", "16");
+    mpv_set_option_string(g_mpv, "deband-grain", "8");
+
+    mpv_set_option_string(g_mpv, "glsl-shaders-append",
+                          "/storage/emulated/0/Android/media/is.xyz.mpv/shaders/Anime4K_Clamp_Highlights.glsl");
+
+    mpv_set_option_string(g_mpv, "glsl-shaders-append",
+                          "/storage/emulated/0/Android/media/is.xyz.mpv/shaders/Anime4K_Darken_Fast.glsl");
+
+    mpv_set_option_string(g_mpv, "glsl-shaders-append",
+                          "/storage/emulated/0/Android/media/is.xyz.mpv/shaders/Anime4K_Thin_Fast.glsl");
+    mpv_set_option_string(g_mpv, "glsl-shaders-append",
+                          "/storage/emulated/0/Android/media/is.xyz.mpv/shaders/Anime4K_Upscale_Original_x2.glsl");
 
     // use terminal log level but request verbose messages
     // this way --msg-level can be used to adjust later
@@ -65,7 +164,7 @@ jni_func(void, create, jobject appctx) {
 jni_func(void, init) {
     if (!g_mpv)
         die("mpv is not created");
-
+    mpv_set_option_string(g_mpv, "config", "no");
     if (mpv_initialize(g_mpv) < 0)
         die("mpv init failed");
 
